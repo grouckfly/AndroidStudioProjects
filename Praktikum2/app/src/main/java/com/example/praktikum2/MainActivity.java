@@ -30,6 +30,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 hitungBMI();
+
+                double hasilKonversi = hitungTinggi();
+
+                if (hasilKonversi != -1) {
+                    tampilHasil(hasilKonversi);
+                }
             }
         });
 
@@ -45,6 +51,23 @@ public class MainActivity extends AppCompatActivity {
         inputBerat = findViewById(R.id.input_berat);
         hitungButton = findViewById(R.id.hitung_button);
         hasilText = findViewById(R.id.hasil_text);
+    }
+
+    private double hitungTinggi() {
+        String tinggiStr = inputTinggi.getText().toString();
+
+        try {
+            double tinggiCm = Double.parseDouble(tinggiStr);
+            return tinggiCm / 3.28;
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Input tidak valid, harap masukkan angka", Toast.LENGTH_SHORT).show();
+            return -1;
+        }
+    }
+
+    private void tampilHasil(double hasilfeet) {
+        String hasilFormatted = String.format("%.2f", hasilfeet);
+        hasilText.setText(hasilFormatted + " feet");
     }
 
     private void hitungBMI() {
