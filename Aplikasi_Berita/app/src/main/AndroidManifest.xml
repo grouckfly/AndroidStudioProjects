@@ -20,7 +20,9 @@
             </intent-filter>
         </activity>
         <activity android:name=".view.MainActivity" />
-        <activity android:name=".view.DetailActivity" />
+        <activity android:name=".view.DetailActivity"
+                  android:hardwareAccelerated="true" />
+
     </application>
 
 </manifest>

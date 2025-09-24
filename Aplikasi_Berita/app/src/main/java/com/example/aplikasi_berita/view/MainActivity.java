@@ -6,11 +6,15 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -20,9 +24,11 @@ import com.example.aplikasi_berita.adapter.NewsAdapter;
 import com.example.aplikasi_berita.model.Article;
 import com.example.aplikasi_berita.network.ApiConfig;
 import com.example.aplikasi_berita.network.VolleySingleton;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,21 +38,22 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private List<Article> articleList = new ArrayList<>();
-
-    private RecyclerView recyclerView;
     private NewsAdapter newsAdapter;
+    private RecyclerView recyclerView;
     private ProgressBar progressBar;
-    private Toolbar toolbar;
+    private TextView tvNotFound;
     private EditText etSearch;
     private ImageView ivSearch;
     private TabLayout tabLayout;
+    private SwipeRefreshLayout swipeRefreshLayout;
+    private String currentCategory = "Indonesia";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        toolbar = findViewById(R.id.toolbar);
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayShowTitleEnabled(false);
@@ -54,39 +61,46 @@ public class MainActivity extends AppCompatActivity {
 
         progressBar = findViewById(R.id.progress_bar);
         recyclerView = findViewById(R.id.rv_berita);
+        tvNotFound = findViewById(R.id.tv_not_found);
         etSearch = findViewById(R.id.et_search);
         ivSearch = findViewById(R.id.iv_search);
         tabLayout = findViewById(R.id.tab_layout);
+        swipeRefreshLayout = findViewById(R.id.swipe_refresh_layout);
 
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         newsAdapter = new NewsAdapter(articleList);
         recyclerView.setAdapter(newsAdapter);
 
         setupTabLayout();
-
-        // Memuat berita default dari tab pertama saat aplikasi dibuka
-        fetchNewsData("Teknologi");
+        fetchNewsData(currentCategory);
 
         ivSearch.setOnClickListener(v -> handleSearch());
-
-        // Menambahkan listener agar bisa search dengan menekan tombol enter/search di keyboard
         etSearch.setOnEditorActionListener((v, actionId, event) -> {
             handleSearch();
             return true;
+        });
+
+        swipeRefreshLayout.setOnRefreshListener(() -> {
+            fetchNewsData(currentCategory);
         });
     }
 
     private void handleSearch() {
         String query = etSearch.getText().toString().trim();
-        if (!query.isEmpty()) {
-            fetchNewsData(query);
-        } else {
-            Toast.makeText(MainActivity.this, "Silakan masukkan kata kunci", Toast.LENGTH_SHORT).show();
+        if (query.isEmpty()) {
+            Toast.makeText(this, "Silakan masukkan kata kunci", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        String finalQuery = query;
+        if (!currentCategory.equals("Indonesia")) {
+            finalQuery = query + " AND " + currentCategory;
+        }
+        fetchNewsData(finalQuery);
     }
 
     private void setupTabLayout() {
-        String[] categories = {"Teknologi", "Bisnis", "Olahraga", "Kesehatan", "Hiburan", "Sains"};
+        String[] categories = {"Semua", "Teknologi", "Bisnis", "Olahraga", "Kesehatan", "Hiburan", "Sains"};
         for (String category : categories) {
             tabLayout.addTab(tabLayout.newTab().setText(category));
         }
@@ -95,7 +109,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
                 String selectedCategory = tab.getText().toString();
-                fetchNewsData(selectedCategory);
+                if (selectedCategory.equals("Semua")) {
+                    currentCategory = "Indonesia";
+                } else {
+                    currentCategory = selectedCategory;
+                }
+                etSearch.setText("");
+                fetchNewsData(currentCategory);
             }
 
             @Override
@@ -107,52 +127,62 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fetchNewsData(String query) {
-        progressBar.setVisibility(View.VISIBLE);
-        recyclerView.setVisibility(View.GONE); // Sembunyikan daftar saat memuat
+        // Hanya tampilkan ProgressBar jika bukan dari aksi swipe
+        if (!swipeRefreshLayout.isRefreshing()) {
+            progressBar.setVisibility(View.VISIBLE);
+        }
+        recyclerView.setVisibility(View.GONE);
+        tvNotFound.setVisibility(View.GONE);
 
         String url = ApiConfig.BASE_URL + ApiConfig.EVERYTHING_ENDPOINT +
-                "?q=" + query +
-                "&language=id" +
-                "&apiKey=" + ApiConfig.API_KEY;
+                "?q=" + query + "&language=id&apiKey=" + ApiConfig.API_KEY;
 
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(
                 Request.Method.GET, url, null,
                 response -> {
                     try {
-                        if (response.getString("status").equals("ok")) {
-                            JSONArray articlesArray = response.getJSONArray("articles");
-                            articleList.clear();
-                            for (int i = 0; i < articlesArray.length(); i++) {
-                                JSONObject articleObject = articlesArray.getJSONObject(i);
-                                String title = articleObject.getString("title");
-                                String description = articleObject.optString("description", "");
-                                String articleUrl = articleObject.getString("url");
-                                String imageUrl = articleObject.optString("urlToImage", "");
-                                String publishedAt = articleObject.getString("publishedAt");
-                                JSONObject sourceObject = articleObject.getJSONObject("source");
-                                String sourceName = sourceObject.getString("name");
-                                Article article = new Article(title, description, articleUrl, imageUrl, publishedAt, sourceName);
-                                articleList.add(article);
-                            }
-                            newsAdapter.notifyDataSetChanged();
+                        articleList.clear();
+                        JSONArray articlesArray = response.getJSONArray("articles");
+                        for (int i = 0; i < articlesArray.length(); i++) {
+                            JSONObject articleObject = articlesArray.getJSONObject(i);
+                            String title = articleObject.getString("title");
+                            String description = articleObject.optString("description", "");
+                            String articleUrl = articleObject.getString("url");
+                            String imageUrl = articleObject.optString("urlToImage", "");
+                            String publishedAt = articleObject.getString("publishedAt");
+                            JSONObject sourceObject = articleObject.getJSONObject("source");
+                            String sourceName = sourceObject.getString("name");
+                            Article article = new Article(title, description, articleUrl, imageUrl, publishedAt, sourceName);
+                            articleList.add(article);
                         }
+
+                        if (articleList.isEmpty()) {
+                            tvNotFound.setVisibility(View.VISIBLE);
+                        } else {
+                            recyclerView.setVisibility(View.VISIBLE);
+                        }
+                        newsAdapter.notifyDataSetChanged();
+
                     } catch (JSONException e) {
                         Log.e(TAG, "Error parsing JSON: " + e.getMessage());
+                        tvNotFound.setVisibility(View.VISIBLE);
                     } finally {
                         progressBar.setVisibility(View.GONE);
-                        recyclerView.setVisibility(View.VISIBLE);
+                        swipeRefreshLayout.setRefreshing(false);
                     }
                 },
                 error -> {
                     Log.e(TAG, "Error Volley: " + error.toString());
-                    Toast.makeText(MainActivity.this, "Gagal memuat berita", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Gagal memuat berita", Toast.LENGTH_SHORT).show();
                     progressBar.setVisibility(View.GONE);
+                    swipeRefreshLayout.setRefreshing(false);
+                    tvNotFound.setVisibility(View.VISIBLE);
                 }
         ) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 Map<String, String> headers = new HashMap<>();
-                headers.put("User-Agent", "Mozilla/5.0");
+                headers.put("User-Agent", "Mozilla/s.0");
                 return headers;
             }
         };

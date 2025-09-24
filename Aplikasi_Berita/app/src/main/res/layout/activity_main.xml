@@ -69,9 +69,9 @@
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
                 android:hint="Search News"
-                android:paddingStart="16dp"
                 android:imeOptions="actionSearch"
-                android:inputType="text"/>
+                android:inputType="text"
+                android:paddingStart="16dp" />
 
             <ImageView
                 android:id="@+id/iv_search"
@@ -82,16 +82,36 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rv_berita"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh_layout"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginTop="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/cv_search"
-        tools:listitem="@layout/list_item_berita" />
+        app:layout_constraintTop_toBottomOf="@id/cv_search">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_berita"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            tools:listitem="@layout/list_item_berita" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+
+    <TextView
+        android:id="@+id/tv_not_found"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Berita tidak ditemukan"
+        android:textSize="18sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/cv_search" />
 
     <ProgressBar
         android:id="@+id/progress_bar"
